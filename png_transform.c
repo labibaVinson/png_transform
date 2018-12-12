@@ -90,12 +90,14 @@ read_png_file(char *file_name, struct decoded_image *img)
 
 	png_read_image(img->png_ptr, img->row_pointers);
 	fclose(fp);
+printf("read is done \n");
 }
 
 
 static void
 write_png_file(char *file_name, struct decoded_image *img)
 {
+ printf("Starting write_png_file\n");
   /* create file */
   FILE *fp = fopen(file_name, "wb");
   if (!fp)
@@ -149,41 +151,68 @@ write_png_file(char *file_name, struct decoded_image *img)
 	png_destroy_write_struct(&img->png_ptr, &img->info_ptr);
 
 	fclose(fp);
+	printf("End write_png_file\n");
 }
 
 
 static int
 process_file(struct decoded_image *img)
 {
-	printf("Checking PNG format\n");
-
+	printf("Checking PNG format\n");	
 	if (png_get_color_type(img->png_ptr, img->info_ptr) != PNG_COLOR_TYPE_RGBA)
-		printf("[process_file] color_type of input file must be PNG_COLOR_TYPE_RGBA (%d) (is %d)", PNG_COLOR_TYPE_RGBA, png_get_color_type(img->png_ptr, img->info_ptr));
+	{
+		printf("[process_file] color_type of input file must be PNG_COLOR_TYPE_RGBA (%d) (is %d)",PNG_COLOR_TYPE_RGBA, png_get_color_type(img->png_ptr, img->info_ptr));
 		return 1;
+	}
 
 	printf("Starting processing\n");
-	for (x = 0; x < img->w; x++)
-	  {
-	  for (y = 0; y < img->w; y++)
-	    {
-	      png_byte *row = img->row_pointers[y];
-	      png_byte *ptr = &(row[x * 4]);
-	      /* set red value to 0 */
-	      ptr[0]  = 0;
-	    }
-	  }
 
-	for (x = 0; x < img->w; x++) {
-		for (y = 0; y < img->w; y++) {
-			png_byte *row = img->row_pointers[y];
-			png_byte *ptr = &(row[x * 4]);
-			/* Then set green value to the blue one */
-			ptr[1]  = ptr[2];
-		}
-	}
-	printf("Processing done\n");
+        for (y=0; y< img->h; y++) {
+                png_byte* row = img->row_pointers[y];
+                for (x=0; x< img->w; x++) {
+                        png_byte* ptr = &(row[x*4]);
+                                                						
+		/* set red value to 0 and green value to the blue one */
+		  ptr[0] = 0;
+                  ptr[1] = ptr[2];
+		
+                }
+        }
 
 	png_destroy_read_struct(&img->png_ptr, &img->info_ptr, NULL);
+	printf("End processing\n");
+
+	return 0;
+}
+static int transformation(struct decoded_image *img, float red,float green,float blue)
+{
+	
+	printf("Checking PNG format\n");	
+	if (png_get_color_type(img->png_ptr, img->info_ptr) != PNG_COLOR_TYPE_RGBA)
+	{
+		printf("[transformation] color_type of input file must be PNG_COLOR_TYPE_RGBA (%d) (is %d)",PNG_COLOR_TYPE_RGBA, png_get_color_type(img->png_ptr, img->info_ptr));
+		return 1;
+	}
+
+	printf("Starting Transformation\n");
+
+        for (y=0; y< img->h; y++) {
+                png_byte* row = img->row_pointers[y];
+                for (x=0; x< img->w; x++) {
+                        png_byte* ptr = &(row[x*4]);
+                                                						
+		/*set weight 0.5 for red, 0.8 for green and 1 for blue */
+		
+                     	ptr[0] = red*ptr[0];
+                        ptr[1] = green*ptr[1];
+			ptr[2] = blue*ptr[2];
+
+                }
+        }
+
+	png_destroy_read_struct(&img->png_ptr, &img->info_ptr, NULL);
+	printf("End Transformation\n");
+
 
 	return 0;
 }
@@ -193,18 +222,43 @@ process_file(struct decoded_image *img)
 int
 main(int argc, char **argv)
 {
-	if (argc != 3)
-		abort_("Usage: program_name <file_in> <file_out>");
+
+	/* variable to choise the transformation to apply*/
+	int c;
+	float red,green,blue;
+	if (argc != 6)
+		abort_("Usage: program_name <file_in> <file_out> <weight red> <weight green> <weight blue>");
 
 	struct decoded_image *img = malloc(sizeof(struct decoded_image));
+	if (!img)
+    	abort_("[main] create struct decoded_image failed");
 
+	
+	printf("Which transformation do you want ? \n");
+	printf("press 1 to set red value to 0 and green value to the blue one \n");
+	printf("press 2 to set 0.5 for red, 0.8 for green and 1 for blue \n");
+
+	scanf("%d",&c);
 	printf("Reading input PNG\n");
-	read_png_file(argv[1], img);
+	read_png_file(argv[1], &img);
+	if(c==1)
+	{
+		process_file(&img);
 
-	process_file(img);
-
-	printf("Writing output PNG\n");
-	write_png_file(argv[2], img);
+		printf("Writing output PNG\n");
+		write_png_file(argv[2], &img);
+	}
+	else
+	if(c==2)
+	{
+		red=atof(argv[3]);
+		green=atof(argv[4]);
+		blue=atof(argv[5]);
+		transformation(&img,red,green,blue);
+		write_png_file(argv[2], &img);
+	}
+		
+       printf("END\n");
 
 	return 0;
 }
